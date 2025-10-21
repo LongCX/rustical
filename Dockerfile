@@ -1,6 +1,6 @@
 FROM rust:1.90-alpine AS chef
 
-RUN echo x86_64-unknown-linux-musl > /tmp/rust_target;; 
+RUN echo x86_64-unknown-linux-musl > /tmp/rust_target
 
 RUN apk add --no-cache musl-dev llvm20 clang perl pkgconf make \
   && rustup target add "$(cat /tmp/rust_target)" \
