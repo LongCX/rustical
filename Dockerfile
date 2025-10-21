@@ -22,10 +22,15 @@ RUN cargo chef cook --release --target "$(cat /tmp/rust_target)"
 COPY . .
 RUN cargo install --target "$(cat /tmp/rust_target)" --path .
 
-FROM scratch
-COPY --from=builder /usr/local/cargo/bin/rustical /usr/local/bin/rustical
-CMD ["/usr/local/bin/rustical"]
+FROM gcr.io/distroless/cc-debian12:nonroot
+COPY --chown=nonroot:nonroot --from=builder /usr/local/bin/rustical /app/rustical
 
-ENV RUSTICAL_DATA_STORE__SQLITE__DB_URL=/var/lib/rustical/db.sqlite3
+USER nonroot
 
+ENV TZ=Asia/Ho_Chi_Minh
+ENV RUSTICAL_DATA_STORE__SQLITE__DB_URL=/etc/rustical/db.sqlite3
+
+VOLUME ["/etc/rustical"]
 EXPOSE 4000
+
+CMD ["/app/rustical"]
