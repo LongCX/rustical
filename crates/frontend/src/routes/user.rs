@@ -91,6 +91,6 @@ pub async fn route_get_home(user: Principal) -> Redirect {
 pub async fn route_root(user: Option<Principal>) -> Redirect {
     match user {
         Some(user) => route_get_home(user).await,
-        None => Redirect::to("/frontend/login"),
+        None => Redirect::to("/frontend/login/oidc"),
     }
 }
