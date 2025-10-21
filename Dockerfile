@@ -23,7 +23,7 @@ COPY . .
 RUN cargo install --target "$(cat /tmp/rust_target)" --path .
 
 FROM gcr.io/distroless/cc-debian12:nonroot
-COPY --chown=nonroot:nonroot --from=builder /usr/local/bin/rustical /app/rustical
+COPY --chown=nonroot:nonroot --from=builder /usr/local/cargo/bin/rustical /app/rustical
 
 USER nonroot
 
