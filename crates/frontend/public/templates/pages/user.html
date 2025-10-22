@@ -19,6 +19,9 @@ window.rusticalUser = JSON.parse(document.querySelector('#data-rustical-user').i
   <a href="/frontend/user/{{ user.id }}/calendar" {% if S::name() == "calendars" %}class="active"{% endif %}>{% include "icons/calendar.svg" %}Calendars</a>
   <a href="/frontend/user/{{ user.id }}/addressbook" {% if S::name() == "addressbooks" %}class="active"{% endif %}>{% include "icons/group.svg" %}Addressbooks</a>
 </nav>
+<form method="POST" action="/frontend/logout" class="logout_form">
+  <button type="submit">Log out</button>
+</form>
 {% endblock %}
 
 {% block content %}
