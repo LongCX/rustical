@@ -1,5 +1,5 @@
 use axum::{
-    Extension, Form,
+    Extension,
     extract::Query,
     response::{IntoResponse, Redirect, Response},
 };
@@ -87,11 +87,6 @@ async fn get_oidc_client(
         client_secret.clone(),
     )
     .set_redirect_uri(redirect_uri))
-}
-
-#[derive(Debug, Deserialize)]
-pub struct GetOidcForm {
-    redirect_uri: Option<String>,
 }
 
 /// Endpoint that redirects to the authorize endpoint of the OIDC service
