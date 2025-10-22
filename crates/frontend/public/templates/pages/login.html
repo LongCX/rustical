@@ -4,35 +4,14 @@
 
 <div class="login_window">
   <h1>Login</h1>
-  {% if let Some(redirect_uri) = redirect_uri %}
-  <p>and redirect to {{redirect_uri}}</p>
-  {% endif %}
-
-  {% if allow_password_login %}
-  <form action="login" method="post" id="form_login">
-    <label for="username">Username</label>
-    <input type="text" id="username" name="username" placeholder="username">
-    <br>
-    <label for="password">Password</label>
-    <input type="password" id="password" name="password" placeholder="password">
-    <br>
-    {% if let Some(redirect_uri) = redirect_uri %}
-    <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
-    {% endif %}
-    <button type="submit">Login</button>
-  </form>
-  {% endif %}
-
   {% if let Some(OidcProviderData {name, redirect_url}) = oidc_data %}
-  <form action="{{ redirect_url }}" method="post" id="form_login">
+  <form action="{{ redirect_url }}" method="get" id="form_login">
     {% if let Some(redirect_uri) = redirect_uri %}
     <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
     {% endif %}
     <button type="submit">Login with {{ name }}</button>
   </form>
-  {% endif %}
-
-  {% if !allow_password_login && oidc_data.is_none() %}
+  {% else %}
   <p>
   No login method available
   </p>

@@ -21,7 +21,6 @@ use url::Url;
 struct LoginPage<'a> {
     redirect_uri: Option<String>,
     oidc_data: Option<OidcProviderData<'a>>,
-    allow_password_login: bool,
 }
 
 struct OidcProviderData<'a> {
@@ -37,7 +36,6 @@ pub struct GetLoginQuery {
 #[instrument(skip(config, oidc_config))]
 pub async fn route_get_login(
     Query(GetLoginQuery { redirect_uri }): Query<GetLoginQuery>,
-    Extension(config): Extension<FrontendConfig>,
     Extension(oidc_config): Extension<Option<OidcConfig>>,
 ) -> Response {
     let oidc_data = oidc_config
@@ -49,7 +47,6 @@ pub async fn route_get_login(
         });
     LoginPage {
         redirect_uri,
-        allow_password_login: config.allow_password_login,
         oidc_data,
     }
     .into_response()
@@ -105,5 +102,5 @@ pub async fn route_post_login<AP: AuthenticationProvider>(
 
 pub async fn route_post_logout(session: Session) -> Redirect {
     session.remove_value("user").await.unwrap();
-    Redirect::to("/")
+    Redirect::to("/frontend/login")
 }

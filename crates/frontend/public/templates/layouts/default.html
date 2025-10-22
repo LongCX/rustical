@@ -14,9 +14,11 @@
   <header>
       <a class="logo" href="/frontend/user">RustiCal</a>
       {% block header_center %}{% endblock %}
+      {% if let Some(userId) = user.id %}
       <form method="POST" action="/frontend/logout" class="logout_form">
         <button type="submit">Log out</button>
       </form>
+      {% endif %}
   </header>
   {% endblock %}
   <div id="app">
