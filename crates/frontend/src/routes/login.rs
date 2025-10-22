@@ -33,7 +33,7 @@ pub struct GetLoginQuery {
     redirect_uri: Option<String>,
 }
 
-#[instrument(skip(config, oidc_config))]
+#[instrument(skip(oidc_config))]
 pub async fn route_get_login(
     Query(GetLoginQuery { redirect_uri }): Query<GetLoginQuery>,
     Extension(oidc_config): Extension<Option<OidcConfig>>,
