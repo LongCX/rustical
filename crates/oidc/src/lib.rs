@@ -99,7 +99,6 @@ pub async fn route_post_oidc(
     Extension(oidc_config): Extension<OidcConfig>,
     session: Session,
     Host(host): Host,
-    Form(GetOidcForm { redirect_uri }): Form<GetOidcForm>,
 ) -> Result<Response, OidcError> {
     let callback_uri = format!("https://{host}/frontend/login/oidc/callback");
 
@@ -130,7 +129,7 @@ pub async fn route_post_oidc(
                 state: csrf_token,
                 nonce,
                 pkce_verifier,
-                redirect_uri,
+                redirect_uri: Some(String::from("/frontend/login/oidc")),
             },
         )
         .await?;
