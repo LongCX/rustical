@@ -90,7 +90,7 @@ pub fn frontend_router<AP: AuthenticationProvider, CS: CalendarStore, AS: Addres
 
     if let Some(oidc_config) = oidc_config.clone() {
         router = router
-            .route("/login/oidc", post(route_post_oidc))
+            .route("/login/oidc", get(route_post_oidc))
             .route(
                 "/login/oidc/callback",
                 get(route_get_oidc_callback::<OidcUserStore<AP>>),
