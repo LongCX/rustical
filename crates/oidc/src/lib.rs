@@ -234,7 +234,7 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
     let redirect_uri = if let Some(redirect_uri) = oidc_state.redirect_uri {
         if let Ok(redirect_url) = base_url.join(&redirect_uri) {
             if redirect_url.origin() == base_url.origin() {
-                redirect_url.path().to_owned()
+                base_url.path().to_owned()
             } else {
                 default_redirect
             }
