@@ -32,5 +32,6 @@ ENV RUSTICAL_DATA_STORE__SQLITE__DB_URL=/etc/rustical/db.sqlite3
 
 VOLUME ["/etc/rustical"]
 EXPOSE 4000
-
 CMD ["/app/rustical"]
+
+HEALTHCHECK --interval=30s --timeout=30s --start-period=3s --retries=3 CMD ["/app/rustical", "health"]
