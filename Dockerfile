@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-FROM rust:1.90-alpine AS chef
-=======
 FROM --platform=$BUILDPLATFORM rust:1.91-alpine AS chef
->>>>>>> upstream/main
 
 RUN echo x86_64-unknown-linux-musl > /tmp/rust_target
 
