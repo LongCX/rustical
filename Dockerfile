@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM rust:1.91-alpine AS chef
+FROM rust:1.91-alpine AS chef
 
 RUN echo x86_64-unknown-linux-musl > /tmp/rust_target
 
