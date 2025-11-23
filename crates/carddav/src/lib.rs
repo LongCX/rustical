@@ -14,7 +14,6 @@ use rustical_store::{
     auth::{AuthenticationProvider, Principal},
 };
 use std::sync::Arc;
-use rustical_oidc::RedisSessionStore;
 
 pub mod address_object;
 pub mod addressbook;
@@ -38,7 +37,6 @@ pub fn carddav_router<AP: AuthenticationProvider, A: AddressbookStore, S: Subscr
     auth_provider: Arc<AP>,
     store: Arc<A>,
     subscription_store: Arc<S>,
-    redis_store: RedisSessionStore,
 ) -> Router {
     let principal_service =
         PrincipalResourceService::new(store, auth_provider.clone(), subscription_store);
@@ -47,7 +45,7 @@ pub fn carddav_router<AP: AuthenticationProvider, A: AddressbookStore, S: Subscr
             prefix,
             RootResourceService::<_, Principal, CardDavPrincipalUri>::new(principal_service)
                 .axum_router()
-                .layer(AuthenticationLayer::new(auth_provider, redis_store))
+                .layer(AuthenticationLayer::new(auth_provider))
                 .layer(Extension(CardDavPrincipalUri(prefix))),
         )
         .route(

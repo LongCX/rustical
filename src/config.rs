@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct HttpConfig {
     pub host: String,
     pub port: u16,
-    pub redis_url: String,
+    pub session_cookie_samesite_strict: bool,
     pub payload_limit_mb: usize,
 }
 
@@ -16,7 +16,7 @@ impl Default for HttpConfig {
         Self {
             host: "0.0.0.0".to_owned(),
             port: 4000,
-            redis_url: "redis://127.0.0.1:6379".to_owned(),
+            session_cookie_samesite_strict: false,
             payload_limit_mb: 4,
         }
     }

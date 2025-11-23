@@ -23,7 +23,8 @@ use std::time::Duration;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::classify::ServerErrorsFailureClass;
 use tower_http::trace::TraceLayer;
-use rustical_oidc::RedisSessionStore;
+use tower_sessions::cookie::SameSite;
+use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
 use tracing::Span;
 use tracing::field::display;
 
@@ -41,8 +42,8 @@ pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
     oidc_config: Option<OidcConfig>,
     nextcloud_login_config: &NextcloudLoginConfig,
     dav_push_enabled: bool,
+    session_cookie_samesite_strict: bool,
     payload_limit_mb: usize,
-    redis_store: RedisSessionStore,
 ) -> Router<()> {
     let birthday_store = Arc::new(ContactBirthdayStore::new(addr_store.clone()));
     let combined_cal_store =
@@ -57,7 +58,6 @@ pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
             combined_cal_store.clone(),
             subscription_store.clone(),
             false,
-            redis_store.clone(),
         ))
         .merge(caldav_router(
             "/caldav-compat",
@@ -65,7 +65,6 @@ pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
             combined_cal_store.clone(),
             subscription_store.clone(),
             true,
-            redis_store.clone(),
         ))
         .route(
             "/.well-known/caldav",
@@ -86,7 +85,6 @@ pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
             auth_provider.clone(),
             addr_store.clone(),
             subscription_store.clone(),
-            redis_store.clone(),
         ));
 
     // GNOME Accounts needs to discover a WebDAV Files endpoint to complete the setup
@@ -107,6 +105,7 @@ pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
         }),
     );
 
+    let session_store = MemoryStore::default();
     if frontend_config.enabled {
         router = router.merge(frontend_router(
             "/frontend",
@@ -115,12 +114,11 @@ pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
             addr_store,
             frontend_config,
             oidc_config,
-            redis_store.clone(),
         ));
     }
 
     if nextcloud_login_config.enabled {
-        router = router.nest("/index.php/login/v2", nextcloud_login_router(auth_provider, redis_store));
+        router = router.nest("/index.php/login/v2", nextcloud_login_router(auth_provider));
     }
 
     if dav_push_enabled {
@@ -128,6 +126,19 @@ pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
     }
 
     router
+        .layer(
+            SessionManagerLayer::new(session_store)
+                .with_name("rustical_session")
+                .with_secure(true)
+                .with_same_site(if session_cookie_samesite_strict {
+                    SameSite::Strict
+                } else {
+                    SameSite::Lax
+                })
+                .with_expiry(Expiry::OnInactivity(
+                    tower_sessions::cookie::time::Duration::hours(2),
+                )),
+        )
         .layer(CatchPanicLayer::new())
         .layer(
             TraceLayer::new_for_http()

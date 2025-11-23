@@ -7,7 +7,6 @@ use axum::{
     response::{Redirect, Response},
     routing::{get, post},
 };
-use axum_extra::extract::CookieJar;
 use headers::{ContentType, HeaderMapExt};
 use http::{Method, StatusCode};
 use routes::{addressbooks::route_addressbooks, calendars::route_calendars};
@@ -16,9 +15,9 @@ use rustical_store::{
     AddressbookStore, CalendarStore,
     auth::{AuthenticationProvider, middleware::AuthenticationLayer},
 };
-
 use std::sync::Arc;
 use url::Url;
+
 mod assets;
 mod config;
 pub mod nextcloud_login;
@@ -27,14 +26,13 @@ pub(crate) mod pages;
 mod routes;
 
 pub use config::FrontendConfig;
-pub use rustical_oidc::RedisSessionStore;
 use oidc_user_store::OidcUserStore;
 
 use crate::routes::{
     addressbook::{route_addressbook, route_addressbook_restore},
     app_token::{route_delete_app_token, route_post_app_token},
     calendar::{route_calendar, route_calendar_restore},
-    login::{route_get_login, route_post_logout},
+    login::{route_get_login, route_post_login, route_post_logout},
     timezones::route_timezones,
     user::{route_get_home, route_root, route_user_named},
 };
@@ -48,7 +46,6 @@ pub fn frontend_router<AP: AuthenticationProvider, CS: CalendarStore, AS: Addres
     addr_store: Arc<AS>,
     frontend_config: FrontendConfig,
     oidc_config: Option<OidcConfig>,
-    redis_store: RedisSessionStore,
 ) -> Router {
     let user_router = Router::new()
         .route("/", get(route_get_home))
@@ -82,7 +79,7 @@ pub fn frontend_router<AP: AuthenticationProvider, CS: CalendarStore, AS: Addres
     let router = Router::new()
         .route("/", get(route_root))
         .nest("/user", user_router)
-        .route("/login", get(route_get_login))
+        .route("/login", get(route_get_login).post(route_post_login::<AP>))
         .route("/logout", post(route_post_logout))
         .route(
             "/_timezones.json",
@@ -113,20 +110,14 @@ pub fn frontend_router<AP: AuthenticationProvider, CS: CalendarStore, AS: Addres
     }
 
     router = router
-        .layer(AuthenticationLayer::new(auth_provider.clone(), redis_store.clone()))
+        .layer(AuthenticationLayer::new(auth_provider.clone()))
         .layer(Extension(auth_provider))
         .layer(Extension(cal_store))
         .layer(Extension(addr_store))
         .layer(Extension(frontend_config))
-        .layer(Extension(oidc_config))
-        .layer(Extension(redis_store));
+        .layer(Extension(oidc_config));
 
     Router::new()
-        .layer(middleware::from_fn(|mut req: Request, next: Next| async move {
-            let jar = CookieJar::from_headers(req.headers());
-            req.extensions_mut().insert(jar);
-            next.run(req).await
-         }))
         .nest(prefix, router)
         .route("/", get(async || Redirect::to(prefix)))
 }

@@ -8,7 +8,6 @@ use rustical_dav::resources::RootResourceService;
 use rustical_store::auth::middleware::AuthenticationLayer;
 use rustical_store::auth::{AuthenticationProvider, Principal};
 use rustical_store::{CalendarStore, SubscriptionStore};
-use rustical_oidc::RedisSessionStore;
 use std::sync::Arc;
 
 pub mod calendar;
@@ -35,7 +34,6 @@ pub fn caldav_router<AP: AuthenticationProvider, C: CalendarStore, S: Subscripti
     store: Arc<C>,
     subscription_store: Arc<S>,
     simplified_home_set: bool,
-    redis_store: RedisSessionStore,
 ) -> Router {
     Router::new().nest(
         prefix,
@@ -46,7 +44,7 @@ pub fn caldav_router<AP: AuthenticationProvider, C: CalendarStore, S: Subscripti
             simplified_home_set,
         })
         .axum_router()
-        .layer(AuthenticationLayer::new(auth_provider, redis_store))
+        .layer(AuthenticationLayer::new(auth_provider))
         .layer(Extension(CalDavPrincipalUri(prefix))),
     )
 }
