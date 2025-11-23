@@ -4,8 +4,9 @@ use axum::{
     Extension,
     extract::Query,
     response::{IntoResponse, Redirect, Response},
+    http::HeaderMap,
 };
-use axum_extra::extract::Host;
+use axum_extra::extract::{Host, cookie::Cookie};
 pub use config::OidcConfig;
 use config::UserIdClaim;
 use error::OidcError;
@@ -15,16 +16,19 @@ use openidconnect::{
     RedirectUrl, TokenResponse, UserInfoClaims,
     core::{CoreClient, CoreGenderClaim, CoreProviderMetadata, CoreResponseType},
 };
+use redis::AsyncCommands;
 use reqwest::{StatusCode, Url};
 use serde::{Deserialize, Serialize};
-use tower_sessions::Session;
 pub use user_store::UserStore;
+use uuid::Uuid;
 
 mod config;
 mod error;
 mod user_store;
 
-const SESSION_KEY_OIDC_STATE: &str = "oidc_state";
+const COOKIE_SESSION_NAME: &str = "rustical-session";
+const REDIS_KEY_OIDC_STATE: &str = "oauth_state";
+const REDIS_KEY_USER_SESSION: &str = "rustical";
 
 #[derive(Debug, Clone)]
 pub struct OidcServiceConfig {
@@ -32,8 +36,128 @@ pub struct OidcServiceConfig {
     pub session_key_user_id: &'static str,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UserSessionData {
+    pub user_id: String,
+    pub email: Option<String>,
+    pub user_agent: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RedisSessionStore {
+    client: redis::Client,
+}
+
+impl RedisSessionStore {
+    pub fn new(redis_url: &str) -> Result<Self, redis::RedisError> {
+        let client = redis::Client::open(redis_url)?;
+        Ok(Self { client })
+    }
+
+    async fn get_connection(&self) -> Result<redis::aio::MultiplexedConnection, OidcError> {
+        self.client
+            .get_multiplexed_async_connection()
+            .await
+            .map_err(|_| OidcError::Other("Failed to connect to Redis"))
+    }
+
+    pub async fn set_oidc_state(
+        &self,
+        state: &OidcState,
+    ) -> Result<(), OidcError> {
+        let mut conn = self.get_connection().await?;
+        let key = format!("{}:{}", REDIS_KEY_OIDC_STATE, state.state.secret());
+        let value = serde_json::to_string(state)
+            .map_err(|_| OidcError::Other("Failed to serialize OIDC state"))?;
+        
+        conn.set_ex::<_, _, ()>(&key, value, 300) // 5 minutes for OIDC state
+            .await
+            .map_err(|_| OidcError::Other("Failed to store OIDC state"))?;
+        
+        Ok(())
+    }
+    
+    pub async fn get_oidc_state(&self, state: &str) -> Result<Option<OidcState>, OidcError> {
+        let mut conn = self.get_connection().await?;
+        let key = format!("{}:{}", REDIS_KEY_OIDC_STATE, state);
+        
+        let value: Option<String> = conn
+            .get(&key)
+            .await
+            .map_err(|_| OidcError::Other("Failed to retrieve OIDC state"))?;
+        
+        match value {
+            Some(v) => {
+                let state = serde_json::from_str(&v)
+                    .map_err(|_| OidcError::Other("Failed to deserialize OIDC state"))?;
+                Ok(Some(state))
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub async fn remove_oidc_state(&self, state: &str) -> Result<(), OidcError> {
+        let mut conn = self.get_connection().await?;
+        let key = format!("{}:{}", REDIS_KEY_OIDC_STATE, state);
+        
+        conn.del::<_, ()>(&key)
+            .await
+            .map_err(|_| OidcError::Other("Failed to delete OIDC state"))?;
+        
+        Ok(())
+    }
+
+    pub async fn set_user_session(
+        &self,
+        session_id: &str,
+        session_data: &UserSessionData,
+    ) -> Result<(), OidcError> {
+        let mut conn = self.get_connection().await?;
+        let key = format!("{}:{}", REDIS_KEY_USER_SESSION, session_id);
+        
+        let value = serde_json::to_string(session_data)
+            .map_err(|_| OidcError::Other("Failed to serialize user session data"))?;
+
+        conn.set_ex::<_, _, ()>(&key, value, 3600 * 24) // 24 hours for user session
+            .await
+            .map_err(|_| OidcError::Other("Failed to store user session"))?;
+        
+        Ok(())
+    }
+
+    pub async fn remove_user_session(&self, session_id: &str) -> Result<(), OidcError> {
+        let mut conn = self.get_connection().await?;
+        let key = format!("{}:{}", REDIS_KEY_USER_SESSION, session_id);
+        
+        conn.del::<_, ()>(&key)
+            .await
+            .map_err(|_| OidcError::Other("Failed to delete user session"))?;
+        
+        Ok(())
+    }
+
+    pub async fn get_user_session(&self, session_id: &str) -> Result<Option<UserSessionData>, OidcError> {
+        let mut conn = self.get_connection().await?;
+        let key = format!("{}:{}", REDIS_KEY_USER_SESSION, session_id);
+        
+        let value: Option<String> = conn
+            .get(&key)
+            .await
+            .map_err(|_| OidcError::Other("Failed to retrieve user session"))?;
+        
+        match value {
+            Some(v) => {
+                let data: UserSessionData = serde_json::from_str(&v)
+                    .map_err(|_| OidcError::Other("Failed to deserialize user session data"))?;
+                Ok(Some(data))
+            }
+            None => Ok(None),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
-struct OidcState {
+pub struct OidcState {
     state: CsrfToken,
     nonce: Nonce,
     pkce_verifier: PkceCodeVerifier,
@@ -91,10 +215,23 @@ async fn get_oidc_client(
     .set_redirect_uri(redirect_uri))
 }
 
+fn create_session_id() -> (String, Option<Cookie<'static>>) {
+    let uuid = Uuid::new_v4();
+    let session_id = format!("rustical:{}", uuid);
+    let cookie = Cookie::build((COOKIE_SESSION_NAME, session_id.clone()))
+        .path("/")
+        .http_only(true)
+        .secure(true)
+        .same_site(axum_extra::extract::cookie::SameSite::Strict)
+        .max_age(time::Duration::days(1))
+        .build();
+    (session_id, Some(cookie))
+}
+
 /// Endpoint that redirects to the authorize endpoint of the OIDC service
 pub async fn route_post_oidc(
     Extension(oidc_config): Extension<OidcConfig>,
-    session: Session,
+    Extension(redis_store): Extension<RedisSessionStore>,
     Host(host): Host,
 ) -> Result<Response, OidcError> {
     let callback_uri = format!("https://{host}/frontend/login/oidc/callback");
@@ -119,10 +256,9 @@ pub async fn route_post_oidc(
         .set_pkce_challenge(pkce_challenge)
         .url();
 
-    session
-        .insert(
-            SESSION_KEY_OIDC_STATE,
-            OidcState {
+    redis_store
+        .set_oidc_state(
+            &OidcState {
                 state: csrf_token,
                 nonce,
                 pkce_verifier,
@@ -147,7 +283,8 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
     Extension(oidc_config): Extension<OidcConfig>,
     Extension(user_store): Extension<US>,
     Extension(service_config): Extension<OidcServiceConfig>,
-    session: Session,
+    Extension(redis_store): Extension<RedisSessionStore>,
+    headers: HeaderMap,
     Query(AuthCallbackQuery { code, iss, state }): Query<AuthCallbackQuery>,
     Host(host): Host,
 ) -> Result<Response, OidcError> {
@@ -156,12 +293,16 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
     if let Some(iss) = iss {
         assert_eq!(iss, oidc_config.issuer);
     }
-    let oidc_state = session
-        .remove::<OidcState>(SESSION_KEY_OIDC_STATE)
+
+    let oidc_state = redis_store
+        .get_oidc_state(&state)
         .await?
         .ok_or(OidcError::Other("No local OIDC state"))?;
 
     assert_eq!(oidc_state.state.secret(), &state);
+
+    // Clean up OIDC state after use
+    redis_store.remove_oidc_state(&state).await?;
 
     let http_client = get_http_client();
     let oidc_client = get_oidc_client(
@@ -247,10 +388,28 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
         default_redirect
     };
 
-    // Complete login flow
-    session
-        .insert(service_config.session_key_user_id, user_id.clone())
-        .await?;
+    let email = user_info_claims.email().map(|e| e.to_string());
+    let user_agent = headers
+        .get(axum::http::header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let session_data = UserSessionData {
+        user_id: user_id.clone(),
+        email,
+        user_agent,
+    };
 
-    Ok(Redirect::to(&redirect_uri).into_response())
+    let (session_id, cookie) = create_session_id();
+    redis_store.set_user_session(&session_id, &session_data).await?;
+
+    let mut response = Redirect::to(redirect_uri.as_str()).into_response();
+    
+    if let Some(cookie) = cookie {
+        response.headers_mut().insert(
+            axum::http::header::SET_COOKIE,
+            cookie.to_string().parse().unwrap(),
+        );
+    }
+
+    Ok(response)
 }

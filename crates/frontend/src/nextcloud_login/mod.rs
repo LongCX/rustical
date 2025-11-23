@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use rustical_oidc::RedisSessionStore;
 mod routes;
 
 #[derive(Debug, Clone)]
@@ -46,7 +47,7 @@ pub struct NextcloudFlows {
     flows: RwLock<HashMap<String, NextcloudFlow>>,
 }
 
-pub fn nextcloud_login_router<AP: AuthenticationProvider>(auth_provider: Arc<AP>) -> Router {
+pub fn nextcloud_login_router<AP: AuthenticationProvider>(auth_provider: Arc<AP>, redis_store: RedisSessionStore) -> Router {
     let nextcloud_flows = Arc::new(NextcloudFlows::default());
 
     Router::new()
@@ -58,6 +59,6 @@ pub fn nextcloud_login_router<AP: AuthenticationProvider>(auth_provider: Arc<AP>
         .route("/", post(post_nextcloud_login))
         .layer(Extension(nextcloud_flows))
         .layer(Extension(auth_provider.clone()))
-        .layer(AuthenticationLayer::new(auth_provider))
+        .layer(AuthenticationLayer::new(auth_provider, redis_store.clone()))
         .layer(middleware::from_fn(unauthorized_handler))
 }

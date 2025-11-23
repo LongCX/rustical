@@ -1,30 +1,38 @@
 use super::AuthenticationProvider;
 use axum::{extract::Request, response::Response};
 use futures_core::future::BoxFuture;
+use axum_extra::extract::CookieJar;
 use headers::{Authorization, HeaderMapExt, authorization::Basic};
 use std::{
     sync::Arc,
     task::{Context, Poll},
 };
 use tower::{Layer, Service};
-use tower_sessions::Session;
 use tracing::{Instrument, info_span};
+use rustical_oidc::RedisSessionStore;
+
+const COOKIE_SESSION_NAME: &str = "rustical-session";
 
 pub struct AuthenticationLayer<AP: AuthenticationProvider> {
     auth_provider: Arc<AP>,
+    redis_store: RedisSessionStore,
 }
 
 impl<AP: AuthenticationProvider> Clone for AuthenticationLayer<AP> {
     fn clone(&self) -> Self {
         Self {
             auth_provider: self.auth_provider.clone(),
+            redis_store: self.redis_store.clone(),
         }
     }
 }
 
 impl<AP: AuthenticationProvider> AuthenticationLayer<AP> {
-    pub const fn new(auth_provider: Arc<AP>) -> Self {
-        Self { auth_provider }
+    pub const fn new(auth_provider: Arc<AP>, redis_store: RedisSessionStore) -> Self {
+        Self { 
+            auth_provider,
+            redis_store,
+        }
     }
 }
 
@@ -35,6 +43,7 @@ impl<S, AP: AuthenticationProvider> Layer<S> for AuthenticationLayer<AP> {
         Self::Service {
             inner,
             auth_provider: self.auth_provider.clone(),
+            redis_store: self.redis_store.clone(),
         }
     }
 }
@@ -42,6 +51,7 @@ impl<S, AP: AuthenticationProvider> Layer<S> for AuthenticationLayer<AP> {
 pub struct AuthenticationMiddleware<S, AP: AuthenticationProvider> {
     inner: S,
     auth_provider: Arc<AP>,
+    redis_store: RedisSessionStore,
 }
 
 impl<S: Clone, AP: AuthenticationProvider> Clone for AuthenticationMiddleware<S, AP> {
@@ -49,6 +59,7 @@ impl<S: Clone, AP: AuthenticationProvider> Clone for AuthenticationMiddleware<S,
         Self {
             inner: self.inner.clone(),
             auth_provider: self.auth_provider.clone(),
+            redis_store: self.redis_store.clone(),
         }
     }
 }
@@ -69,14 +80,21 @@ where
     fn call(&mut self, mut request: Request) -> Self::Future {
         let auth_header: Option<Authorization<Basic>> = request.headers().typed_get();
         let ap = self.auth_provider.clone();
+        let redis_store = self.redis_store.clone();
         let mut inner = self.inner.clone();
 
         Box::pin(async move {
-            if let Some(session) = request.extensions().get::<Session>()
-                && let Ok(Some(user_id)) = session.get::<String>("user").await
-                && let Ok(Some(user)) = ap.get_principal(&user_id).await
-            {
-                request.extensions_mut().insert(user);
+            if let Some(cookie_jar) = request.extensions().get::<CookieJar>() {
+                if let Some(session_cookie) = cookie_jar.get(COOKIE_SESSION_NAME) {
+                    let session_id = session_cookie.value();
+                    
+                    // Get user session data from Redis
+                    if let Ok(Some(session_data)) = redis_store.get_user_session(session_id).await {
+                        if let Ok(Some(user)) = ap.get_principal(&session_data.user_id).await {
+                            request.extensions_mut().insert(user);
+                        }
+                    }
+                }
             }
 
             if let Some(auth) = auth_header {

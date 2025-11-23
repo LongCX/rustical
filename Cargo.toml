@@ -76,7 +76,7 @@ base64 = "0.22"
 thiserror = "2.0"
 quick-xml = { version = "0.38" }
 rust-embed = "8.5"
-tower-sessions = "0.14"
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
 futures-core = "0.3.31"
 hex = { version = "0.4.3", features = ["serde"] }
 mime_guess = "2.0"
@@ -124,7 +124,7 @@ percent-encoding = "2.3"
 chrono-tz = "0.10"
 chrono-humanize = "0.2"
 rand = "0.9"
-axum-extra = { version = "0.12", features = ["typed-header"] }
+axum-extra = { version = "0.12", features = ["typed-header", "cookie"] }
 rrule = "0.14"
 argon2 = "0.5"
 rpassword = "7.3"
@@ -148,6 +148,7 @@ ece = { version = "2.3", default-features = false, features = [
 ] }
 openssl = { version = "0.10", features = ["vendored"] }
 async-std = { version = "1.13", features = ["attributes"] }
+time = "0.3"
 
 [dependencies]
 rustical_store.workspace = true
@@ -181,7 +182,7 @@ tracing-subscriber = { version = "0.3", features = [
   "registry",
 ] }
 figment = { version = "0.10", features = ["env", "toml"] }
-tower-sessions.workspace = true
+redis.workspace = true
 rpassword.workspace = true
 tower.workspace = true
 argon2.workspace = true
@@ -196,3 +197,4 @@ tower-http.workspace = true
 axum-extra.workspace = true
 headers.workspace = true
 http.workspace = true
+time.workspace = true

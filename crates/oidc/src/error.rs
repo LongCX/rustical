@@ -16,9 +16,6 @@ pub enum OidcError {
     #[error(transparent)]
     OidcClaimsVerificationError(#[from] ClaimsVerificationError),
 
-    #[error(transparent)]
-    SessionError(#[from] tower_sessions::session::Error),
-
     #[error("{0}")]
     Other(&'static str),
 }

@@ -1,20 +1,17 @@
-use std::sync::Arc;
-
-use crate::{FrontendConfig, OidcConfig, pages::DefaultLayoutData};
+use crate::{OidcConfig, pages::DefaultLayoutData};
 use askama::Template;
 use askama_web::WebTemplate;
 use axum::{
-    Extension, Form,
+    Extension,
     extract::Query,
     response::{IntoResponse, Redirect, Response},
 };
-use axum_extra::extract::Host;
-use http::StatusCode;
-use rustical_store::auth::AuthenticationProvider;
+use axum_extra::extract::CookieJar;
 use serde::Deserialize;
-use tower_sessions::Session;
-use tracing::{instrument, warn};
-use url::Url;
+use tracing::instrument;
+use rustical_oidc::RedisSessionStore;
+
+const COOKIE_SESSION_NAME: &str = "rustical-session";
 
 #[derive(Template, WebTemplate)]
 #[template(path = "pages/login.html")]
@@ -58,55 +55,9 @@ pub async fn route_get_login(
     .into_response()
 }
 
-#[derive(Deserialize)]
-pub struct PostLoginForm {
-    username: String,
-    password: String,
-    redirect_uri: Option<String>,
-}
-
-// #[instrument(skip(password, auth_provider, config))]
-pub async fn route_post_login<AP: AuthenticationProvider>(
-    Extension(auth_provider): Extension<Arc<AP>>,
-    Extension(config): Extension<FrontendConfig>,
-    session: Session,
-    Host(host): Host,
-    Form(PostLoginForm {
-        username,
-        password,
-        redirect_uri,
-    }): Form<PostLoginForm>,
-) -> Response {
-    if !config.allow_password_login {
-        return StatusCode::METHOD_NOT_ALLOWED.into_response();
+pub async fn route_post_logout(Extension(redis_store): Extension<RedisSessionStore>, jar: CookieJar,) -> Redirect {
+    if let Some(session_id) = jar.get(COOKIE_SESSION_NAME) {
+        redis_store.remove_user_session(session_id.value()).await.ok();
     }
-    let default_redirect = "/frontend/user".to_string();
-    // Ensure that redirect_uri never goes cross-origin
-    let base_url: Url = format!("https://{host}").parse().unwrap();
-    let redirect_uri = if let Some(redirect_uri) = redirect_uri {
-        if let Ok(redirect_url) = base_url.join(&redirect_uri) {
-            if redirect_url.origin() == base_url.origin() {
-                redirect_url.path().to_owned()
-            } else {
-                default_redirect
-            }
-        } else {
-            default_redirect
-        }
-    } else {
-        default_redirect
-    };
-
-    if let Ok(Some(user)) = auth_provider.validate_password(&username, &password).await {
-        session.insert("user", user.id).await.unwrap();
-        Redirect::to(&redirect_uri).into_response()
-    } else {
-        warn!("Failed password login attempt as {username}");
-        StatusCode::UNAUTHORIZED.into_response()
-    }
-}
-
-pub async fn route_post_logout(session: Session) -> Redirect {
-    session.remove_value("user").await.unwrap();
     Redirect::to("/frontend/login")
 }

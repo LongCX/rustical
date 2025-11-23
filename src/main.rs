@@ -24,6 +24,7 @@ use tokio::sync::mpsc::Receiver;
 use tower::Layer;
 use tower_http::normalize_path::NormalizePathLayer;
 use tracing::info;
+use rustical_oidc::RedisSessionStore;
 
 mod app;
 mod commands;
@@ -120,6 +121,8 @@ async fn main() -> Result<()> {
                 }));
             }
 
+            let redis_store = RedisSessionStore::new(&config.http.redis_url).unwrap();
+
             let app = make_app(
                 addr_store.clone(),
                 cal_store.clone(),
@@ -129,8 +132,8 @@ async fn main() -> Result<()> {
                 config.oidc.clone(),
                 &config.nextcloud_login,
                 config.dav_push.enabled,
-                config.http.session_cookie_samesite_strict,
                 config.http.payload_limit_mb,
+                redis_store,
             );
             let app = ServiceExt::<Request>::into_make_service(
                 NormalizePathLayer::trim_trailing_slash().layer(app),
