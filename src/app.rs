@@ -24,9 +24,10 @@ use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::classify::ServerErrorsFailureClass;
 use tower_http::trace::TraceLayer;
 use tower_sessions::cookie::SameSite;
-use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
+use tower_sessions::{Expiry, SessionManagerLayer};
 use tracing::Span;
 use tracing::field::display;
+use tower_sessions_redis_store::{fred::prelude::*, RedisStore};
 
 #[allow(
     clippy::too_many_arguments,
@@ -44,6 +45,7 @@ pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
     dav_push_enabled: bool,
     session_cookie_samesite_strict: bool,
     payload_limit_mb: usize,
+    redis_url: String,
 ) -> Router<()> {
     let birthday_store = Arc::new(ContactBirthdayStore::new(addr_store.clone()));
     let combined_cal_store =
@@ -105,7 +107,13 @@ pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
         }),
     );
 
-    let session_store = MemoryStore::default();
+    let config = Config::from_url(&redis_url).unwrap();
+    let pool = Pool::new(config, None, None, None, 6).unwrap();
+
+    let _ = pool.connect();
+
+    let session_store = RedisStore::new(pool);
+
     if frontend_config.enabled {
         router = router.merge(frontend_router(
             "/frontend",
@@ -128,7 +136,7 @@ pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
     router
         .layer(
             SessionManagerLayer::new(session_store)
-                .with_name("rustical_session")
+                .with_name("rustical-session")
                 .with_secure(true)
                 .with_same_site(if session_cookie_samesite_strict {
                     SameSite::Strict
@@ -136,7 +144,7 @@ pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
                     SameSite::Lax
                 })
                 .with_expiry(Expiry::OnInactivity(
-                    tower_sessions::cookie::time::Duration::hours(2),
+                    tower_sessions::cookie::time::Duration::days(1),
                 )),
         )
         .layer(CatchPanicLayer::new())

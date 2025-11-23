@@ -133,6 +133,7 @@ async fn main() -> Result<()> {
                 config.dav_push.enabled,
                 config.http.session_cookie_samesite_strict,
                 config.http.payload_limit_mb,
+                config.http.redis_url,
             );
             let app = ServiceExt::<Request>::into_make_service(
                 NormalizePathLayer::trim_trailing_slash().layer(app),

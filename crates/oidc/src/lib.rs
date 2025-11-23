@@ -4,6 +4,7 @@ use axum::{
     Extension,
     extract::Query,
     response::{IntoResponse, Redirect, Response},
+    http::HeaderMap,
 };
 use axum_extra::extract::Host;
 pub use config::OidcConfig;
@@ -19,12 +20,13 @@ use reqwest::{StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 pub use user_store::UserStore;
+use uuid::Uuid;
 
 mod config;
 mod error;
 mod user_store;
 
-const SESSION_KEY_OIDC_STATE: &str = "oidc_state";
+const SESSION_KEY_OIDC_STATE: &str = "oauth_state";
 
 #[derive(Debug, Clone)]
 pub struct OidcServiceConfig {
@@ -38,6 +40,13 @@ struct OidcState {
     nonce: Nonce,
     pkce_verifier: PkceCodeVerifier,
     redirect_uri: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UserSessionData {
+    pub user_id: String,
+    pub email: Option<String>,
+    pub user_agent: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -150,6 +159,7 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
     session: Session,
     Query(AuthCallbackQuery { code, iss, state }): Query<AuthCallbackQuery>,
     Host(host): Host,
+    headers: HeaderMap,
 ) -> Result<Response, OidcError> {
     let callback_uri = format!("https://{host}/frontend/login/oidc/callback");
 
@@ -248,9 +258,23 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
     };
 
     // Complete login flow
-    session
-        .insert(service_config.session_key_user_id, user_id.clone())
-        .await?;
+    let uuid = Uuid::new_v4();
+    let key = format!("{}:{}", "rustical", uuid);
+    let user_agent = headers
+        .get(axum::http::header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let email = user_info_claims
+    .email()
+    .ok_or(OidcError::Other("Missing email claim"))?;
+    let session_data = UserSessionData {
+        user_id: user_id.clone(),
+        email: Some(email.to_string()),
+        user_agent,
+    };
+    let value = serde_json::to_string(&session_data)
+            .map_err(|_| OidcError::Other("Failed to serialize user session data"))?;
+    session.insert(&key, value).await?;
 
     Ok(Redirect::to(&redirect_uri).into_response())
 }
