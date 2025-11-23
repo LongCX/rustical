@@ -76,7 +76,7 @@ base64 = "0.22"
 thiserror = "2.0"
 quick-xml = { version = "0.38" }
 rust-embed = "8.5"
-redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+redis = { version = "0.32.7", features = ["tokio-comp", "connection-manager"] }
 futures-core = "0.3.31"
 hex = { version = "0.4.3", features = ["serde"] }
 mime_guess = "2.0"
