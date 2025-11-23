@@ -44,7 +44,6 @@ struct OidcState {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct UserSessionData {
-    pub user_id: String,
     pub email: Option<String>,
     pub user_agent: Option<String>,
 }
@@ -258,6 +257,10 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
     };
 
     // Complete login flow
+    session
+        .insert(service_config.session_key_user_id, user_id.clone())
+        .await?;
+    // Store user session data
     let uuid = Uuid::new_v4();
     let key = format!("{}:{}", "rustical", uuid);
     let user_agent = headers
@@ -268,7 +271,6 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
     .email()
     .ok_or(OidcError::Other("Missing email claim"))?;
     let session_data = UserSessionData {
-        user_id: user_id.clone(),
         email: Some(email.to_string()),
         user_agent,
     };
