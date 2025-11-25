@@ -20,7 +20,6 @@ use reqwest::{StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 pub use user_store::UserStore;
-use uuid::Uuid;
 
 mod config;
 mod error;
@@ -44,6 +43,7 @@ struct OidcState {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct UserSessionData {
+    pub user_id: Option<String>,
     pub email: Option<String>,
     pub user_agent: Option<String>,
 }
@@ -257,26 +257,23 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
     };
 
     // Complete login flow
-    session
-        .insert(service_config.session_key_user_id, user_id.clone())
-        .await?;
-    // Store user session data
-    let uuid = Uuid::new_v4();
-    let key = format!("{}:{}", "rustical", uuid);
     let user_agent = headers
         .get(axum::http::header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
     let email = user_info_claims
-    .email()
-    .ok_or(OidcError::Other("Missing email claim"))?;
+        .email()
+        .ok_or(OidcError::Other("Missing email claim"))?;
     let session_data = UserSessionData {
+        user_id: Some(user_id.to_string()),
         email: Some(email.to_string()),
         user_agent,
     };
-    let value = serde_json::to_string(&session_data)
+    let data_user = serde_json::to_string(&session_data)
             .map_err(|_| OidcError::Other("Failed to serialize user session data"))?;
-    session.insert(&key, value).await?;
+    session
+        .insert(service_config.session_key_user_id, data_user)
+        .await?;
 
     Ok(Redirect::to(&redirect_uri).into_response())
 }

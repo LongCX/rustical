@@ -9,6 +9,7 @@ use std::{
 use tower::{Layer, Service};
 use tower_sessions::Session;
 use tracing::{Instrument, info_span};
+use serde_json::Value;
 
 pub struct AuthenticationLayer<AP: AuthenticationProvider> {
     auth_provider: Arc<AP>,
@@ -72,13 +73,17 @@ where
         let mut inner = self.inner.clone();
 
         Box::pin(async move {
-            if let Some(session) = request.extensions().get::<Session>()
-                && let Ok(Some(user_id)) = session.get::<String>("user").await
-                && let Ok(Some(user)) = ap.get_principal(&user_id).await
-            {
-                request.extensions_mut().insert(user);
+            if let Some(session) = request.extensions().get::<Session>() {
+                if let Ok(Some(session_json_str)) = session.get::<String>("user-rustical").await {
+                    if let Ok(json_value) = serde_json::from_str::<Value>(&session_json_str) {
+                        if let Some(user_id) = json_value.get("user_id").and_then(|v| v.as_str()) {
+                            if let Ok(Some(user)) = ap.get_principal(user_id).await {
+                                request.extensions_mut().insert(user);
+                            }
+                        }
+                    }
+                }
             }
-
             if let Some(auth) = auth_header {
                 let user_id = auth.username();
                 let password = auth.password();

@@ -104,7 +104,7 @@ pub fn frontend_router<AP: AuthenticationProvider, CS: CalendarStore, AS: Addres
             .layer(Extension(OidcUserStore(auth_provider.clone())))
             .layer(Extension(OidcServiceConfig {
                 default_redirect_path: "/frontend/user",
-                session_key_user_id: "user",
+                session_key_user_id: "user-rustical",
             }))
             .layer(Extension(oidc_config));
     }
