@@ -163,14 +163,18 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
     let callback_uri = format!("https://{host}/frontend/login/oidc/callback");
 
     if let Some(iss) = iss {
-        assert_eq!(iss, oidc_config.issuer);
+        if iss != oidc_config.issuer {
+            return Err(OidcError::Other("Invalid issuer OIDC"));
+        }
     }
     let oidc_state = session
         .remove::<OidcState>(SESSION_KEY_OIDC_STATE)
         .await?
-        .ok_or(OidcError::Other("No local OIDC state"))?;
+        .ok_or(OidcError::Other("Missing OIDC state"))?;
 
-    assert_eq!(oidc_state.state.secret(), &state);
+    if oidc_state.state.secret() != &state {
+        return Err(OidcError::Other("Invalid OIDC state"));
+    }
 
     let http_client = get_http_client();
     let oidc_client = get_oidc_client(
@@ -185,13 +189,30 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
         .set_pkce_verifier(oidc_state.pkce_verifier)
         .request_async(&http_client)
         .await
-        .map_err(|_| OidcError::Other("Error requesting token"))?;
-    let id_claims = token_response
-        .id_token()
-        .ok_or(OidcError::Other("OIDC provider did not return an ID token"))?
-        .claims(&oidc_client.id_token_verifier(), &oidc_state.nonce)?;
+        .map_err(|_| OidcError::Other("Error requesting token OIDC"))?;
 
-    let user_info_claims: UserInfoClaims<GroupAdditionalClaims, CoreGenderClaim> = oidc_client
+    let id_token = token_response
+        .id_token()
+        .ok_or(OidcError::Other("Missing id token OIDC"))?;
+
+    let id_claims = id_token
+        .claims(&oidc_client.id_token_verifier(), &oidc_state.nonce)
+        .map_err(|e| OidcError::OidcClaimsVerificationError(e))?;
+
+    if !id_claims
+        .audiences()
+        .iter()
+        .any(|a| a.as_str() == oidc_config.client_id.as_str()) {
+        return Err(OidcError::Other("Invalid OIDC client id"));
+    }
+
+    if let Some(azp) = id_claims.authorized_party() {
+        if azp != &oidc_config.client_id {
+            return Err(OidcError::Other("Invalid OIDC client id"));
+        }
+    }
+
+    let user_info: UserInfoClaims<GroupAdditionalClaims, CoreGenderClaim> = oidc_client
         .user_info(
             token_response.access_token().clone(),
             Some(id_claims.subject().clone()),
@@ -200,26 +221,28 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
         .await
         .map_err(|e| OidcError::UserInfo(e.to_string()))?;
 
-    if let Some(require_group) = &oidc_config.require_group
-        && !user_info_claims
+    if let Some(required_group) = &oidc_config.require_group {
+        let has_group = user_info
             .additional_claims()
             .groups
-            .clone()
-            .unwrap_or_default()
-            .contains(require_group)
-    {
-        return Ok((
-            StatusCode::UNAUTHORIZED,
-            "User is not in an authorized group to use RustiCal",
-        )
-            .into_response());
+            .as_ref()
+            .map(|groups| groups.contains(required_group))
+            .unwrap_or(false);
+
+        if !has_group {
+            return Ok((
+                StatusCode::FORBIDDEN,
+                "Access denied: user not in required group",
+            )
+                .into_response());
+        }
     }
 
     let user_id = match oidc_config.claim_userid {
-        UserIdClaim::Sub => user_info_claims.subject().to_string(),
-        UserIdClaim::PreferredUsername => user_info_claims
+        UserIdClaim::Sub => user_info.subject().to_string(),
+        UserIdClaim::PreferredUsername => user_info
             .preferred_username()
-            .ok_or(OidcError::Other("Missing preferred_username claim"))?
+            .ok_or(OidcError::Other("Missing preferred_username claim OIDC"))?
             .to_string(),
     };
 
@@ -240,28 +263,11 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
         }
     }
 
-    let default_redirect = service_config.default_redirect_path.to_owned();
-    let base_url: Url = format!("https://{host}").parse().unwrap();
-    let redirect_uri = if let Some(redirect_uri) = oidc_state.redirect_uri {
-        if let Ok(redirect_url) = base_url.join(&redirect_uri) {
-            if redirect_url.origin() == base_url.origin() {
-                base_url.path().to_owned()
-            } else {
-                default_redirect
-            }
-        } else {
-            default_redirect
-        }
-    } else {
-        default_redirect
-    };
-
-    // Complete login flow
     let user_agent = headers
         .get(axum::http::header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
-    let email = user_info_claims
+    let email = user_info
         .email()
         .ok_or(OidcError::Other("Missing email claim"))?;
     let session_data = UserSessionData {
@@ -275,5 +281,21 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
         .insert(service_config.session_key_user_id, data_user)
         .await?;
 
-    Ok(Redirect::to(&redirect_uri).into_response())
+    let base_url = Url::parse(&format!("https://{host}"))
+        .map_err(|_| OidcError::Other("Invalid host"))?;
+
+    let redirect_to = oidc_state
+        .redirect_uri
+        .as_deref()
+        .and_then(|path| base_url.join(path).ok())
+        .filter(|url| url.origin() == base_url.origin()) 
+        .map(|url| url.to_string())
+        .unwrap_or_else(|| {
+            base_url
+                .join(&service_config.default_redirect_path)
+                .unwrap_or(base_url)
+                .to_string()
+        });
+
+    Ok(Redirect::to(&redirect_to).into_response())
 }
