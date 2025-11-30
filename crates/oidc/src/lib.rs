@@ -134,7 +134,7 @@ pub async fn route_post_oidc(
                 state: csrf_token,
                 nonce,
                 pkce_verifier,
-                redirect_uri: Some(String::from("/frontend/login/oidc")),
+                redirect_uri: Some(String::from("/")),
             },
         )
         .await?;
