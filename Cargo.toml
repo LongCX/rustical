@@ -2,7 +2,7 @@
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.10.5"
+version = "0.11.1"
 rust-version = "1.91"
 edition = "2024"
 description = "A CalDAV server"
@@ -134,7 +134,7 @@ syn = { version = "2.0", features = ["full"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 heck = "0.5"
-darling = "0.21"
+darling = "0.23"
 reqwest = { version = "0.12", features = [
   "rustls-tls",
   "charset",

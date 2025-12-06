@@ -16,7 +16,8 @@ use rustical_frontend::{FrontendConfig, frontend_router};
 use rustical_oidc::OidcConfig;
 use rustical_store::auth::AuthenticationProvider;
 use rustical_store::{
-    AddressbookStore, CalendarStore, CombinedCalendarStore, ContactBirthdayStore, SubscriptionStore,
+    AddressbookStore, CalendarStore, CombinedCalendarStore, PrefixedCalendarStore,
+    SubscriptionStore,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -34,7 +35,11 @@ use tower_sessions_redis_store::{fred::prelude::*, RedisStore};
     clippy::too_many_lines,
     clippy::cognitive_complexity
 )]
-pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
+pub fn make_app<
+    AS: AddressbookStore + PrefixedCalendarStore,
+    CS: CalendarStore,
+    S: SubscriptionStore,
+>(
     addr_store: Arc<AS>,
     cal_store: Arc<CS>,
     subscription_store: Arc<S>,
@@ -47,7 +52,7 @@ pub fn make_app<AS: AddressbookStore, CS: CalendarStore, S: SubscriptionStore>(
     payload_limit_mb: usize,
     redis_url: String,
 ) -> Router<()> {
-    let birthday_store = Arc::new(ContactBirthdayStore::new(addr_store.clone()));
+    let birthday_store = addr_store.clone();
     let combined_cal_store =
         Arc::new(CombinedCalendarStore::new(cal_store).with_store(birthday_store));
 
