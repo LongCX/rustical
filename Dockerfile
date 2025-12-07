@@ -22,8 +22,12 @@ RUN cargo chef cook --release --target "$(cat /tmp/rust_target)"
 COPY . .
 RUN cargo install --target "$(cat /tmp/rust_target)" --path .
 
+FROM alpine:latest AS tz
+RUN apk add --no-cache tzdata
+
 FROM scratch
 COPY --chown=65532:65532 --from=builder /usr/local/cargo/bin/rustical /app/rustical
+COPY --chown=65532:65532 --from=tz /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
 
 USER 65532:65532
 
