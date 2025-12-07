@@ -23,9 +23,9 @@ COPY . .
 RUN cargo install --target "$(cat /tmp/rust_target)" --path .
 
 FROM scratch
-COPY --chown=nonroot:nonroot --from=builder /usr/local/cargo/bin/rustical /app/rustical
+COPY --chown=65532:65532 --from=builder /usr/local/cargo/bin/rustical /app/rustical
 
-USER nonroot
+USER 65532:65532
 
 ENV RUSTICAL_DATA_STORE__SQLITE__DB_URL=/etc/rustical/db.sqlite3
 
