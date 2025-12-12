@@ -37,4 +37,4 @@ VOLUME ["/etc/rustical"]
 EXPOSE 4000
 CMD ["/app/rustical"]
 
-HEALTHCHECK --interval=150s --timeout=10s --start-period=5s --retries=3 CMD ["/app/rustical", "health"]
+HEALTHCHECK --interval=120s --timeout=2s --start-period=5s --retries=3 CMD ["/app/rustical", "health"]
