@@ -1866,6 +1866,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8fae54786f62fb2918dcfae3d568594e50eb9b5c25bf04371af6fe7516452fb"
 
 [[package]]
+name = "insta"
+version = "1.44.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5c943d4415edd8153251b6f197de5eb1640e56d84e8d9159bea190421c73698"
+dependencies = [
+ "console",
+ "once_cell",
+ "similar",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3181,7 +3192,7 @@ dependencies = [
 
 [[package]]
 name = "rustical"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "anyhow",
  "argon2",
@@ -3192,6 +3203,7 @@ dependencies = [
  "figment",
  "headers",
  "http",
+ "insta",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",
@@ -3201,6 +3213,7 @@ dependencies = [
  "quick-xml",
  "reqwest",
  "rpassword",
+ "rstest",
  "rustical_caldav",
  "rustical_carddav",
  "rustical_dav",
@@ -3225,7 +3238,7 @@ dependencies = [
 
 [[package]]
 name = "rustical_caldav"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "async-std",
  "async-trait",
@@ -3239,6 +3252,7 @@ dependencies = [
  "headers",
  "http",
  "ical",
+ "insta",
  "percent-encoding",
  "quick-xml",
  "rstest",
@@ -3266,7 +3280,7 @@ dependencies = [
 
 [[package]]
 name = "rustical_carddav"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "async-trait",
  "axum",
@@ -3277,6 +3291,7 @@ dependencies = [
  "futures-util",
  "http",
  "ical",
+ "insta",
  "percent-encoding",
  "quick-xml",
  "rustical_dav",
@@ -3298,7 +3313,7 @@ dependencies = [
 
 [[package]]
 name = "rustical_dav"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "async-trait",
  "axum",
@@ -3323,7 +3338,7 @@ dependencies = [
 
 [[package]]
 name = "rustical_dav_push"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "async-trait",
  "axum",
@@ -3348,7 +3363,7 @@ dependencies = [
 
 [[package]]
 name = "rustical_frontend"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "askama",
  "askama_web",
@@ -3384,7 +3399,7 @@ dependencies = [
 
 [[package]]
 name = "rustical_ical"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "axum",
  "chrono",
@@ -3401,7 +3416,7 @@ dependencies = [
 
 [[package]]
 name = "rustical_oidc"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "async-trait",
  "axum",
@@ -3420,7 +3435,7 @@ dependencies = [
 
 [[package]]
 name = "rustical_store"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3454,7 +3469,7 @@ dependencies = [
 
 [[package]]
 name = "rustical_store_sqlite"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3476,7 +3491,7 @@ dependencies = [
 
 [[package]]
 name = "rustical_xml"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "quick-xml",
  "thiserror 2.0.17",
@@ -5283,7 +5298,7 @@ checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
 
 [[package]]
 name = "xml_derive"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "darling 0.23.0",
  "heck",

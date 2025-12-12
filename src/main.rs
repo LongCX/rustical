@@ -31,6 +31,8 @@ mod app;
 mod commands;
 mod config;
 mod setup_tracing;
+#[cfg(test)]
+mod tests;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -91,21 +93,22 @@ async fn get_data_stores(
 async fn main() -> Result<()> {
     let args = Args::parse();
 
+    let parse_config = || {
+        Figment::new()
+            .merge(Toml::file(&args.config_file))
+            .merge(Env::prefixed("RUSTICAL_").split("__"))
+            .extract()
+    };
+
     match args.command {
         Some(Command::GenConfig(gen_config_args)) => cmd_gen_config(gen_config_args)?,
         Some(Command::Principals(principals_args)) => cmd_principals(principals_args).await?,
         Some(Command::Health(health_args)) => {
-            let config: Config = Figment::new()
-                .merge(Toml::file(&args.config_file))
-                .merge(Env::prefixed("RUSTICAL_").split("__"))
-                .extract()?;
+            let config: Config = parse_config()?;
             cmd_health(config.http, health_args).await?;
         }
         None => {
-            let config: Config = Figment::new()
-                .merge(Toml::file(&args.config_file))
-                .merge(Env::prefixed("RUSTICAL_").split("__"))
-                .extract()?;
+            let config: Config = parse_config()?;
 
             setup_tracing(&config.tracing);
 

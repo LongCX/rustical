@@ -1,6 +1,6 @@
-import { i, x } from "./lit-DkXrt_Iv.mjs";
-import { n as n$1, t } from "./property-B8WoKf1Y.mjs";
-import { e, n } from "./ref-BwbQvJBB.mjs";
+import { i, x } from "./lit-DKg0et_P.mjs";
+import { n as n$1, t } from "./property-C8WJQOrH.mjs";
+import { e, n } from "./ref-BivNNNRN.mjs";
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -30,23 +30,25 @@ let ImportAddressbookForm = class extends i {
         <form @submit=${this.submit} ${n(this.form)}>
           <label>
             principal (for group addressbook)
-            <select name="principal" value=${this.user} @change=${(e2) => this.principal = e2.target.value}>
-              <option value=${this.user}>${this.user}</option>
+            <select name="principal" required .value=${this.user} @change=${(e2) => this.principal = e2.target.value}>
+              <option .value=${this.user}>${this.user}</option>
               ${window.rusticalUser.memberships.map((membership) => x`
-                <option value=${membership}>${membership}</option>
+                <option .value=${membership}>${membership}</option>
               `)}
             </select>
           </label>
           <br>
           <label>
             id
-            <input type="text" name="id" value=${this.addressbook_id} @change=${(e2) => this.addressbook_id = e2.target.value} />
+            <input type="text" required .value=${this.addressbook_id} @change=${(e2) => this.addressbook_id = e2.target.value} />
           </label>
           <br>
           <label>
             file
-            <input type="file" accept="text/vcard" name="file" @change=${(e2) => this.file = e2.target.files[0]} />
+            <input type="file" accept="text/vcard" required @change=${(e2) => this.file = e2.target.files[0]} />
           </label>
+          <br>
+          <br>
           <button type="submit">Import</button>
           <button type="submit" @click=${(event) => {
       event.preventDefault();
