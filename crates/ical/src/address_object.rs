@@ -179,4 +179,9 @@ END:VCALENDAR",
         }
         Ok(out)
     }
+
+    #[must_use]
+    pub const fn get_vcard(&self) -> &VcardContact {
+        &self.vcard
+    }
 }

@@ -2,7 +2,7 @@
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.11.5"
+version = "0.11.6"
 rust-version = "1.91"
 edition = "2024"
 description = "A CalDAV server"
@@ -36,7 +36,7 @@ opentelemetry = [
 debug = 0
 
 [workspace.dependencies]
-rustical_dav = { path = "./crates/dav/" }
+rustical_dav = { path = "./crates/dav/", features = ["ical"] }
 rustical_dav_push = { path = "./crates/dav_push/" }
 rustical_store = { path = "./crates/store/" }
 rustical_store_sqlite = { path = "./crates/store_sqlite/" }
