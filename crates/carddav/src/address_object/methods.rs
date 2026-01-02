@@ -7,6 +7,7 @@ use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Response};
 use axum_extra::TypedHeader;
 use axum_extra::headers::{ContentType, ETag, HeaderMapExt, IfNoneMatch};
+use http::HeaderValue;
 use http::Method;
 use http::{HeaderMap, StatusCode};
 use rustical_dav::privileges::UserPrivilege;
@@ -81,15 +82,37 @@ pub async fn put_object<AS: AddressbookStore>(
     }
 
     let overwrite = if let Some(TypedHeader(if_none_match)) = if_none_match {
-        if_none_match == IfNoneMatch::any()
+        // TODO: Put into transaction?
+        let existing = match addr_store
+            .get_object(&principal, &addressbook_id, &object_id, false)
+            .await
+        {
+            Ok(existing) => Some(existing),
+            Err(rustical_store::Error::NotFound) => None,
+            Err(err) => Err(err)?,
+        };
+        existing.is_none_or(|existing| {
+            if_none_match.precondition_passes(
+                &existing
+                    .get_etag()
+                    .parse()
+                    .expect("We only generate valid ETags"),
+            )
+        })
     } else {
         true
     };
 
     let object = AddressObject::from_vcf(object_id, body)?;
+    let etag = object.get_etag();
     addr_store
         .put_object(principal, addressbook_id, object, overwrite)
         .await?;
 
-    Ok(StatusCode::CREATED.into_response())
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "ETag",
+        HeaderValue::from_str(&etag).expect("Contains no invalid characters"),
+    );
+    Ok((StatusCode::CREATED, headers).into_response())
 }

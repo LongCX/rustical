@@ -1,4 +1,4 @@
-use super::ParamFilterElement;
+use super::{Allof, ParamFilterElement};
 use ical::{parser::Component, property::Property};
 use rustical_dav::xml::TextMatchElement;
 use rustical_ical::AddressObject;
@@ -22,54 +22,52 @@ pub struct PropFilterElement {
     pub(crate) text_match: Vec<TextMatchElement>,
     #[xml(ns = "rustical_dav::namespace::NS_CARDDAV", flatten)]
     pub(crate) param_filter: Vec<ParamFilterElement>,
+    #[xml(ty = "attr", default = "Default::default")]
+    pub test: Allof,
 
     #[xml(ty = "attr")]
     pub(crate) name: String,
-
-    #[xml(ty = "attr")]
-    pub anyof: Option<String>,
-    #[xml(ty = "attr")]
-    pub allof: Option<String>,
 }
 
 impl PropFilterElement {
+    #[must_use]
+    pub fn match_property(&self, property: &Property) -> bool {
+        let Allof(allof) = self.test;
+        let text_matches = self
+            .text_match
+            .iter()
+            .map(|text_match| text_match.match_property(property));
+
+        let param_matches = self
+            .param_filter
+            .iter()
+            .map(|param_filter| param_filter.match_property(property));
+        let mut matches = text_matches.chain(param_matches);
+
+        if allof {
+            matches.all(|a| a)
+        } else {
+            matches.any(|a| a)
+        }
+    }
+
     pub fn match_component(&self, comp: &impl PropFilterable) -> bool {
-        let property = comp.get_property(&self.name);
-        let _property = match (self.is_not_defined.is_some(), property) {
-            // We are the component that's not supposed to be defined
-            (true, Some(_))
-            // We don't match
-            | (false, None) => return false,
-            // We shall not be and indeed we aren't
-            (true, None) => return true,
-            (false, Some(property)) => property
-        };
+        let properties = comp.get_named_properties(&self.name);
+        if self.is_not_defined.is_some() {
+            return properties.is_empty();
+        }
 
-        let _allof = match (self.allof.is_some(), self.anyof.is_some()) {
-            (true, false) => true,
-            (false, _) => false,
-            (true, true) => panic!("wat"),
-        };
-
-        // TODO: IMPLEMENT
-        // if let Some(text_match) = &self.text_match
-        //     && !text_match.match_property(property)
-        // {
-        //     return false;
-        // }
-
-        // TODO: param-filter
-
-        true
+        // The filter matches when one property instance matches
+        properties.iter().any(|prop| self.match_property(prop))
     }
 }
 
 pub trait PropFilterable {
-    fn get_property(&self, name: &str) -> Option<&Property>;
+    fn get_named_properties(&self, name: &str) -> Vec<&Property>;
 }
 
 impl PropFilterable for AddressObject {
-    fn get_property(&self, name: &str) -> Option<&Property> {
-        self.get_vcard().get_property(name)
+    fn get_named_properties(&self, name: &str) -> Vec<&Property> {
+        self.get_vcard().get_named_properties(name)
     }
 }

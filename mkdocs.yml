@@ -59,6 +59,8 @@ markdown_extensions:
   - admonition
   - attr_list
   - pymdownx.tabbed
+  - pymdownx.tasklist:
+      custom_checkbox: true
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
@@ -73,7 +75,9 @@ nav:
   - OpenID Connect: setup/oidc.md
   - Developers:
       - developers/index.md
-      - Relevant RFCs: developers/rfcs.md
+      - Relevant RFCs:
+          - developers/rfcs.md
+          - RFC 6352: developers/rfcs/rfc6352.md
       - Frontend: developers/frontend.md
       - Debugging: developers/debugging.md
   - Cargo docs: /rustical/_crate/rustical/

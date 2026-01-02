@@ -1,9 +1,10 @@
 use super::comp_filter::{CompFilterElement, CompFilterable};
 use crate::calendar_object::CalendarObjectPropWrapperName;
+use ical::property::Property;
 use rustical_dav::xml::{PropfindType, TextMatchElement};
 use rustical_ical::{CalendarObject, UtcDateTime};
 use rustical_store::calendar_store::CalendarQuery;
-use rustical_xml::XmlDeserialize;
+use rustical_xml::{XmlDeserialize, XmlRootTag};
 
 #[derive(XmlDeserialize, Clone, Debug, PartialEq, Eq)]
 #[allow(dead_code)]
@@ -27,7 +28,25 @@ pub struct ParamFilterElement {
     pub(crate) name: String,
 }
 
-#[derive(XmlDeserialize, Clone, Debug, PartialEq)]
+impl ParamFilterElement {
+    #[must_use]
+    pub fn match_property(&self, prop: &Property) -> bool {
+        let Some(param) = prop.get_param(&self.name) else {
+            return self.is_not_defined.is_some();
+        };
+        if self.is_not_defined.is_some() {
+            return false;
+        }
+
+        let Some(text_match) = self.text_match.as_ref() else {
+            return true;
+        };
+        text_match.match_text(param)
+    }
+}
+
+#[derive(XmlDeserialize, XmlRootTag, Clone, Debug, PartialEq)]
+#[xml(root = "filter", ns = "rustical_dav::namespace::NS_CALDAV")]
 #[allow(dead_code)]
 // https://datatracker.ietf.org/doc/html/rfc4791#section-9.7
 pub struct FilterElement {

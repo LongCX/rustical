@@ -17,6 +17,7 @@ use rustical_store::auth::Principal;
 use rustical_xml::{EnumVariants, PropName};
 use rustical_xml::{XmlDeserialize, XmlSerialize};
 use serde::Deserialize;
+use std::borrow::Cow;
 
 #[derive(XmlDeserialize, XmlSerialize, PartialEq, Eq, Clone, EnumVariants, PropName)]
 #[xml(unit_variants_ident = "CalendarPropName")]
@@ -41,7 +42,7 @@ pub enum CalendarProp {
     SupportedCalendarData(SupportedCalendarData),
     #[xml(ns = "rustical_dav::namespace::NS_CALDAV", skip_deserializing)]
     SupportedCollationSet(SupportedCollationSet),
-    #[xml(ns = "rustical_dav::namespace::NS_DAV")]
+    #[xml(ns = "rustical_dav::namespace::NS_CALDAV")]
     MaxResourceSize(i64),
     #[xml(skip_deserializing)]
     #[xml(ns = "rustical_dav::namespace::NS_DAV")]
@@ -72,8 +73,8 @@ pub struct CalendarResource {
 }
 
 impl ResourceName for CalendarResource {
-    fn get_name(&self) -> String {
-        self.cal.id.clone()
+    fn get_name(&self) -> Cow<'_, str> {
+        Cow::from(&self.cal.id)
     }
 }
 

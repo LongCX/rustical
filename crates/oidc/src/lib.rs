@@ -6,10 +6,11 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     http::HeaderMap,
 };
-use axum_extra::extract::Host;
+use axum_extra::TypedHeader;
 pub use config::OidcConfig;
 use config::UserIdClaim;
 use error::OidcError;
+use headers::Host;
 use openidconnect::{
     AuthenticationFlow, AuthorizationCode, CsrfToken, EndpointMaybeSet, EndpointNotSet,
     EndpointSet, IssuerUrl, Nonce, OAuth2TokenResponse, PkceCodeChallenge, PkceCodeVerifier,

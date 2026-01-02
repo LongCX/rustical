@@ -158,7 +158,9 @@ mod tests {
     use super::*;
     use crate::{
         address_object::AddressObjectPropName,
-        addressbook::methods::report::addressbook_query::{FilterElement, PropFilterElement},
+        addressbook::methods::report::addressbook_query::{
+            Allof, FilterElement, LimitElement, NresultsElement, PropFilterElement,
+        },
     };
     use rustical_dav::xml::{PropElement, sync_collection::SyncLevel};
 
@@ -235,6 +237,9 @@ mod tests {
                 <card:filter>
                     <card:prop-filter name="FN"/>
                 </card:filter>
+                <card:limit>
+                    <card:nresults>100</card:nresults>
+                </card:limit>
             </card:addressbook-query>
         "#,
         )
@@ -250,17 +255,18 @@ mod tests {
                     vec![]
                 )),
                 filter: FilterElement {
-                    anyof: None,
-                    allof: None,
+                    test: Allof::default(),
                     prop_filter: vec![PropFilterElement {
                         name: "FN".to_owned(),
                         is_not_defined: None,
                         text_match: vec![],
                         param_filter: vec![],
-                        allof: None,
-                        anyof: None
-                    }]
-                }
+                        test: Allof::default()
+                    }],
+                },
+                limit: Some(LimitElement {
+                    nresults: NresultsElement(100)
+                })
             })
         );
     }
