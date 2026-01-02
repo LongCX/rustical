@@ -104,7 +104,7 @@ async fn get_oidc_client(
 pub async fn route_post_oidc(
     Extension(oidc_config): Extension<OidcConfig>,
     session: Session,
-    Host(host): Host,
+    TypedHeader(host): TypedHeader<Host>,
 ) -> Result<Response, OidcError> {
     let callback_uri = format!("https://{host}/frontend/login/oidc/callback");
 
@@ -158,7 +158,7 @@ pub async fn route_get_oidc_callback<US: UserStore + Clone>(
     Extension(service_config): Extension<OidcServiceConfig>,
     session: Session,
     Query(AuthCallbackQuery { code, iss, state }): Query<AuthCallbackQuery>,
-    Host(host): Host,
+    TypedHeader(host): TypedHeader<Host>,
     headers: HeaderMap,
 ) -> Result<Response, OidcError> {
     let callback_uri = format!("https://{host}/frontend/login/oidc/callback");
