@@ -1,10 +1,13 @@
+use std::str::FromStr;
+
 use crate::Error;
 use crate::calendar::CalendarResourceService;
 use crate::calendar::prop::SupportedCalendarComponentSet;
+use crate::error::Precondition;
 use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Response};
+use caldata::IcalParser;
 use http::{Method, StatusCode};
-use ical::IcalParser;
 use rustical_dav::xml::HrefElement;
 use rustical_ical::CalendarObjectType;
 use rustical_store::auth::Principal;
@@ -84,20 +87,33 @@ pub async fn route_mkcalendar<C: CalendarStore, S: SubscriptionStore>(
     }
 
     let timezone_id = if let Some(tzid) = request.calendar_timezone_id {
+        if chrono_tz::Tz::from_str(&tzid).is_err() {
+            return Err(Error::PreconditionFailed(Precondition::CalendarTimezone(
+                "Invalid timezone ID in calendar-timezone-id",
+            )));
+        }
         Some(tzid)
     } else if let Some(tz) = request.calendar_timezone {
-        // TODO: Proper error (calendar-timezone precondition)
-        let calendar = IcalParser::new(tz.as_bytes())
+        let calendar = IcalParser::from_slice(tz.as_bytes())
             .next()
-            .ok_or_else(|| rustical_dav::Error::BadRequest("No timezone data provided".to_owned()))?
-            .map_err(|_| rustical_dav::Error::BadRequest("Error parsing timezone".to_owned()))?;
+            .ok_or(Error::PreconditionFailed(Precondition::CalendarTimezone(
+                "No timezone data provided",
+            )))?
+            .map_err(|_| {
+                Error::PreconditionFailed(Precondition::CalendarTimezone("Error parsing timezone"))
+            })?;
 
-        let timezone = calendar.timezones.first().ok_or_else(|| {
-            rustical_dav::Error::BadRequest("No timezone data provided".to_owned())
-        })?;
-        let timezone: chrono_tz::Tz = timezone.try_into().map_err(|_| {
-            rustical_dav::Error::BadRequest("Cannot translate VTIMEZONE into IANA TZID".to_owned())
-        })?;
+        let timezone = calendar
+            .vtimezones
+            .values()
+            .next()
+            .ok_or(Error::PreconditionFailed(Precondition::CalendarTimezone(
+                "No timezone data provided",
+            )))?;
+        let timezone: Option<chrono_tz::Tz> = timezone.into();
+        let timezone = timezone.ok_or(Error::PreconditionFailed(
+            Precondition::CalendarTimezone("No timezone data provided"),
+        ))?;
 
         Some(timezone.name().to_owned())
     } else {

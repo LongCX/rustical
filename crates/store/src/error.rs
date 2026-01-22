@@ -26,7 +26,7 @@ pub enum Error {
     Other(#[from] anyhow::Error),
 
     #[error(transparent)]
-    IcalError(#[from] rustical_ical::Error),
+    IcalError(#[from] caldata::parser::ParserError),
 }
 
 impl Error {
@@ -36,7 +36,7 @@ impl Error {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::AlreadyExists => StatusCode::CONFLICT,
             Self::ReadOnly => StatusCode::FORBIDDEN,
-            Self::IcalError(err) => err.status_code(),
+            Self::IcalError(_err) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::InvalidPrincipalType(_) => StatusCode::BAD_REQUEST,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -52,9 +52,7 @@ impl IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {
         if matches!(
             self.status_code(),
-            StatusCode::INTERNAL_SERVER_ERROR
-                | StatusCode::PRECONDITION_FAILED
-                | StatusCode::CONFLICT
+            StatusCode::INTERNAL_SERVER_ERROR | StatusCode::CONFLICT
         ) {
             error!("{self}");
         }

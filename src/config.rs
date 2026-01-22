@@ -30,6 +30,8 @@ pub struct SqliteDataStoreConfig {
     pub db_url: String,
     #[serde(default = "default_true")]
     pub run_repairs: bool,
+    #[serde(default = "default_true")]
+    pub skip_broken: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

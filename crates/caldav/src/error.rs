@@ -12,6 +12,9 @@ pub enum Precondition {
     #[error("valid-calendar-data")]
     #[xml(ns = "rustical_dav::namespace::NS_CALDAV")]
     ValidCalendarData,
+    #[error("calendar-timezone")]
+    #[xml(ns = "rustical_dav::namespace::NS_CALDAV")]
+    CalendarTimezone(&'static str),
 }
 
 impl IntoResponse for Precondition {
@@ -23,7 +26,7 @@ impl IntoResponse for Precondition {
         if let Err(err) = error.serialize_root(&mut writer) {
             return rustical_dav::Error::from(err).into_response();
         }
-        let mut res = Response::builder().status(StatusCode::PRECONDITION_FAILED);
+        let mut res = Response::builder().status(StatusCode::FORBIDDEN);
         res.headers_mut().unwrap().typed_insert(ContentType::xml());
         res.body(Body::from(output)).unwrap()
     }
@@ -53,9 +56,6 @@ pub enum Error {
     XmlDecodeError(#[from] rustical_xml::XmlError),
 
     #[error(transparent)]
-    IcalError(#[from] rustical_ical::Error),
-
-    #[error(transparent)]
     PreconditionFailed(Precondition),
 }
 
@@ -75,18 +75,20 @@ impl Error {
             Self::XmlDecodeError(_) => StatusCode::BAD_REQUEST,
             Self::ChronoParseError(_) | Self::NotImplemented => StatusCode::INTERNAL_SERVER_ERROR,
             Self::NotFound => StatusCode::NOT_FOUND,
-            Self::IcalError(err) => err.status_code(),
-            Self::PreconditionFailed(_err) => StatusCode::PRECONDITION_FAILED,
+            // The correct status code for a failed precondition is not PreconditionFailed but
+            // Forbidden (or Conflict):
+            // https://datatracker.ietf.org/doc/html/rfc4791#section-1.3
+            Self::PreconditionFailed(_err) => StatusCode::FORBIDDEN,
         }
     }
 }
 
 impl IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {
-        if matches!(
-            self.status_code(),
-            StatusCode::INTERNAL_SERVER_ERROR | StatusCode::PRECONDITION_FAILED
-        ) {
+        if let Self::PreconditionFailed(precondition) = self {
+            return precondition.into_response();
+        }
+        if matches!(self.status_code(), StatusCode::INTERNAL_SERVER_ERROR) {
             error!("{self}");
         }
         (self.status_code(), self.to_string()).into_response()
