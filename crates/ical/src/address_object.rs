@@ -6,7 +6,7 @@ use caldata::{
         IcalEventBuilder, VcardContact,
     },
     generator::Emitter,
-    parser::ContentLine,
+    parser::{ContentLine, ParserOptions},
     property::{
         Calscale, IcalCALSCALEProperty, IcalDTENDProperty, IcalDTSTAMPProperty,
         IcalDTSTARTProperty, IcalPRODIDProperty, IcalRRULEProperty, IcalSUMMARYProperty,
@@ -17,7 +17,7 @@ use caldata::{
 };
 use chrono::{NaiveDate, Utc};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -134,9 +134,9 @@ impl AddressObject {
                     .into(),
                 ],
                 inner: Some(CalendarInnerDataBuilder::Event(vec![event])),
-                vtimezones: HashMap::default(),
+                vtimezones: BTreeMap::default(),
             }
-            .build(None)?
+            .build(&ParserOptions::default(), None)?
             .into(),
         ))
     }
