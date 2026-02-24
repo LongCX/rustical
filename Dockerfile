@@ -38,14 +38,17 @@ RUN cargo chef cook --release --target "$(cat /tmp/rust_target)"
 COPY . .
 RUN cargo install --locked --target "$(cat /tmp/rust_target)" --path .
 
+FROM alpine:latest AS tz
+RUN apk add --no-cache tzdata
+
 FROM scratch
-COPY --from=builder /usr/local/cargo/bin/rustical /usr/local/bin/rustical
-CMD ["/usr/local/bin/rustical"]
+COPY --chown=65532:65532 --from=tz /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
+COPY --chown=65532:65532 --from=tz /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --chown=65532:65532 --from=builder /usr/local/cargo/bin/rustical /app/rustical
+CMD ["/app/rustical"]
 
-ENV RUSTICAL_DATA_STORE__SQLITE__DB_URL=/var/lib/rustical/db.sqlite3
+ENV RUSTICAL_DATA_STORE__SQLITE__DB_URL=/etc/rustical/db.sqlite3
 
-LABEL org.opencontainers.image.authors="Lennart Kämmle github.com/lennart-k"
-LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later"
 EXPOSE 4000
 
-HEALTHCHECK --interval=30s --timeout=30s --start-period=3s --retries=3 CMD ["/usr/local/bin/rustical", "health"]
+HEALTHCHECK --interval=120s --timeout=30s --start-period=5s --retries=3 CMD ["/app/rustical", "health"]
