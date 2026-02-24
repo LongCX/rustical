@@ -105,7 +105,7 @@ pub fn frontend_router<
                 oidc_config,
                 OidcServiceConfig {
                     default_redirect_path: "/frontend/user",
-                    session_key_user_id: "user",
+                    session_key_user_id: "user-rustical",
                     callback_path: "/frontend/login/oidc/callback",
                 },
                 OidcUserStore(auth_provider.clone()),

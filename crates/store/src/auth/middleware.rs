@@ -74,7 +74,7 @@ where
 
         Box::pin(async move {
             if let Some(session) = request.extensions().get::<Session>() {
-                if let Ok(Some(session_json_str)) = session.get::<String>("rustical-session").await {
+                if let Ok(Some(session_json_str)) = session.get::<String>("user-rustical").await {
                     if let Ok(json_value) = serde_json::from_str::<Value>(&session_json_str) {
                         if let Some(user_id) = json_value.get("user_id").and_then(|v| v.as_str()) {
                             if let Ok(Some(user)) = ap.get_principal(user_id).await {
