@@ -32,6 +32,7 @@ pub fn get_app(context: TestStoreContext) -> axum::Router {
         false,
         true,
         20,
+        "redis://".to_owned(),
     )
 }
 

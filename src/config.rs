@@ -10,6 +10,7 @@ pub struct HttpConfig {
     pub port: u16,
     pub session_cookie_samesite_strict: bool,
     pub payload_limit_mb: usize,
+    pub redis_url: String,
 }
 
 impl Default for HttpConfig {
@@ -19,6 +20,7 @@ impl Default for HttpConfig {
             port: 4000,
             session_cookie_samesite_strict: false,
             payload_limit_mb: 4,
+            redis_url: "redis://127.0.0.1:6379".to_owned(),
         }
     }
 }

@@ -7,6 +7,7 @@ use axum::{
     Extension, Form,
     extract::Query,
     response::{IntoResponse, Redirect, Response},
+    http::{header::USER_AGENT, HeaderMap},
 };
 use axum_extra::TypedHeader;
 use headers::Host;
@@ -18,7 +19,7 @@ use openidconnect::{
     core::{CoreClient, CoreGenderClaim, CoreProviderMetadata, CoreResponseType},
 };
 use reqwest::Url;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tower_sessions::Session;
 
@@ -122,6 +123,12 @@ pub struct AuthCallbackQuery {
     state: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UserSessionData {
+    pub user_id: Option<String>,
+    pub user_agent: Option<String>,
+}
+
 /// Resolves the OIDC callback data to get the user id an the groups claim
 async fn resolve_oidc_callback(
     config: &OidcConfig,
@@ -183,6 +190,7 @@ pub async fn route_get_oidc_callback<US: UserStore>(
     session: Session,
     Query(AuthCallbackQuery { code, iss, state }): Query<AuthCallbackQuery>,
     TypedHeader(host): TypedHeader<Host>,
+    headers: HeaderMap,
 ) -> Result<Response, OidcError> {
     if let Some(iss) = iss {
         assert_eq!(iss, oidc_config.issuer);
@@ -245,9 +253,20 @@ pub async fn route_get_oidc_callback<US: UserStore>(
         default_redirect
     };
 
+    let user_agent = headers
+        .get(USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let session_data = UserSessionData {
+        user_id: Some(user_id.to_string()),
+        user_agent,
+    };
+    let data_user = serde_json::to_string(&session_data)
+            .map_err(|_| OidcError::Other("Failed to serialize user session data"))?;
+
     // Complete login flow
     session
-        .insert(service_config.session_key_user_id, user_id.clone())
+        .insert(service_config.session_key_user_id, data_user)
         .await?;
 
     Ok(Redirect::to(&redirect_uri).into_response())
