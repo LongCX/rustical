@@ -110,6 +110,6 @@ pub async fn route_post_login<AP: AuthenticationProvider>(
 }
 
 pub async fn route_post_logout(session: Session) -> Redirect {
-    session.remove_value("user-rustical").await.unwrap();
+    session.remove_value("user").await.unwrap();
     Redirect::to("/")
 }
