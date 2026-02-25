@@ -24,12 +24,47 @@
   {% endif %}
 
   {% if let Some(OidcProviderData {name, redirect_url}) = oidc_data %}
+  <style>
+    .spinner {
+      width: 25px;
+      height: 22px;
+      border: 2px solid #ccc;
+      border-top: 2px solid #333;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style>
   <form action="{{ redirect_url }}" method="post" id="form_login">
     {% if let Some(redirect_uri) = redirect_uri %}
     <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
     {% endif %}
-    <button type="submit">Login with {{ name }}</button>
+    <button type="submit" id="oidc_button">Login with {{ name }}</button>
   </form>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const form = document.getElementById("form_login");
+        const button = document.getElementById("oidc_button");
+    
+        function showLoading() {
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner"></span> Redirecting...';
+        }
+    
+        form.addEventListener("submit", function () {
+            showLoading();
+        });
+
+        showLoading();
+        form.submit();
+    });
+  </script>
   {% endif %}
 
   {% if !allow_password_login && oidc_data.is_none() %}
