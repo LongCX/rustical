@@ -51,16 +51,14 @@
     document.addEventListener("DOMContentLoaded", function () {
         const form = document.getElementById("form_login");
         const button = document.getElementById("oidc_button");
-    
+        const originalText = button.innerHTML;
         function showLoading() {
             button.disabled = true;
-            button.innerHTML = '<span class="spinner"></span> Redirecting...';
+            button.innerHTML = '<span class="spinner"></span>' + originalText + '...';
         }
-    
         form.addEventListener("submit", function () {
             showLoading();
         });
-
         showLoading();
         form.submit();
     });
